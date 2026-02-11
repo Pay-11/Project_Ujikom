@@ -2,11 +2,13 @@ import { createRouter, createWebHistory } from '@ionic/vue-router'
 import { RouteRecordRaw } from 'vue-router'
 import HomePage from '../views/HomePage.vue'
 import ScanQr from '../views/ScanQr.vue'
+import GuruQr from '../views/GuruQr.vue'
+import GuruHome from '../views/GuruHome.vue'
 
 const routes: Array<RouteRecordRaw> = [
   {
     path: '/',
-    redirect: '/home'
+    redirect: '/guru'
   },
   {
     path: '/home',
@@ -17,7 +19,17 @@ const routes: Array<RouteRecordRaw> = [
     path: '/scan',
     name: 'Scan',
     component: ScanQr
-  }
+  },
+  {
+    path: '/guruqr',
+    name: 'GuruQr',
+    component: GuruQr
+  },
+  {
+    path: '/guru',
+    name: 'Guru',
+    component: GuruHome
+  }   
 ]
 
 const router = createRouter({
