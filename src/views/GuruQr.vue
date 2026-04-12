@@ -1,11 +1,8 @@
 <template>
   <ion-page>
 
-    <!-- ===== HEADER ===== -->
     <ion-header>
       <ion-toolbar class="header">
-
-        <!-- BACK BUTTON -->
         <ion-buttons slot="start">
           <ion-back-button default-href="/guru" />
         </ion-buttons>
@@ -14,76 +11,74 @@
       </ion-toolbar>
     </ion-header>
 
-    <!-- ===== CONTENT ===== -->
     <ion-content>
 
-      <!-- ABSEN UTAMA -->
+      <!-- CARD ABSEN -->
       <div class="absen-card">
         <p class="subtitle">Mulai Absensi Kelas</p>
         <h2>XII RPL 2</h2>
 
-        <!-- QR -->
         <div class="qr-wrapper">
-          <img
-            v-if="absenAktif"
-            :src="qrUrl"
-            alt="QR Absensi"
-          />
+          <img v-if="absenAktif" :src="qrUrl" alt="QR Absensi" />
           <div v-else class="qr-placeholder">
             QR belum aktif
           </div>
         </div>
 
-        <!-- BUTTON -->
-        <ion-button
-          expand="block"
-          color="success"
-          v-if="!absenAktif"
-          @click="mulaiAbsen"
-        >
+        <ion-button expand="block" color="success" @click="mulaiAbsen">
           Mulai Absensi
         </ion-button>
-
-        <ion-button
-          expand="block"
-          color="danger"
-          v-else
-          @click="akhiriAbsen"
-        >
-          Akhiri Absensi
-        </ion-button>
-
-        <p v-if="absenAktif" class="timer">
-          ⏱ Berakhir dalam {{ waktu }} menit
-        </p>
       </div>
 
-      <!-- MENU -->
-      <ion-list class="menu">
 
-        <ion-item button>
-          <ion-icon slot="start" :icon="peopleOutline" />
-          <ion-label>Daftar Hadir Siswa</ion-label>
-        </ion-item>
+      <!-- LIST SISWA YANG SUDAH ABSEN -->
+      <div class="student-list-section" v-if="absenAktif">
 
-        <ion-item button>
-          <ion-icon slot="start" :icon="calendarOutline" />
-          <ion-label>Rekap Absensi</ion-label>
-        </ion-item>
+        <div class="list-header">
+          <h3>
+            Sudah Hadir
+            <span class="badge">{{ siswaAbsen.length }}</span>
+          </h3>
+        </div>
 
-        <ion-item button>
-          <ion-icon slot="start" :icon="settingsOutline" />
-          <ion-label>Pengaturan Absensi</ion-label>
-        </ion-item>
+        <div v-if="isLoading" class="empty-state">
+          Memuat data siswa...
+        </div>
 
-      </ion-list>
+        <div v-else-if="siswaAbsen.length === 0" class="empty-state">
+          Belum ada siswa yang melakukan scan
+        </div>
+
+        <ion-list class="student-list" v-else>
+
+          <ion-item v-for="student in siswaAbsen" :key="student.id" class="success-anim">
+
+            <ion-icon slot="start" :icon="personOutline" class="avatar-icon" />
+
+            <div class="student-info">
+              <h2>{{ student.name }}</h2>
+              <p v-if="student.status === 'hadir'">
+                Telah discan / Hadir
+              </p>
+              <p v-else>
+                {{ student.status }}
+              </p>
+            </div>
+
+          </ion-item>
+
+        </ion-list>
+
+      </div>
 
     </ion-content>
   </ion-page>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+
+import { ref, onMounted, onUnmounted, computed } from 'vue'
+
 import {
   IonPage,
   IonHeader,
@@ -94,37 +89,180 @@ import {
   IonList,
   IonItem,
   IonIcon,
-  IonLabel,
   IonButtons,
-  IonBackButton
+  IonBackButton,
+  IonSelect,
+  IonSelectOption
 } from '@ionic/vue'
 
-import {
-  peopleOutline,
-  calendarOutline,
-  settingsOutline
-} from 'ionicons/icons'
+import { personOutline } from 'ionicons/icons'
+import api from '../services/api'
 
 const absenAktif = ref(false)
-const waktu = ref(45)
+const qrUrl = ref('')
+const sesiId = ref(null)
 
-const qrUrl = ref(
-  'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=ABSEN_XII_RPL_2'
-)
+const allStudents = ref([])
+const isLoading = ref(true)
 
-function mulaiAbsen() {
-  absenAktif.value = true
+let pollingInterval = null
+
+
+// FILTER SISWA YANG SUDAH ABSEN
+const siswaAbsen = computed(() => {
+  return allStudents.value.filter(s => s.status !== null)
+})
+
+
+// NORMALIZE DATA
+const normalizeStudents = (data) => {
+
+  if (!Array.isArray(data) && typeof data === 'object') {
+    data = Object.values(data)
+  }
+
+  return data.map(m => ({
+    id: String(m.id),
+    name: m.name,
+    status: m.status
+  }))
+
 }
 
-function akhiriAbsen() {
-  absenAktif.value = false
+
+// POLLING DATA ABSENSI
+const startPolling = async () => {
+
+  if (pollingInterval) clearInterval(pollingInterval)
+
+  isLoading.value = true
+
+  try {
+
+    const res = await api.get(`murid-sesi/${sesiId.value}`)
+
+    allStudents.value = normalizeStudents(res.data.data || [])
+
+  } catch (err) {
+
+    console.error("Gagal memuat data murid:", err)
+
+  } finally {
+
+    isLoading.value = false
+
+  }
+
+  pollingInterval = setInterval(async () => {
+
+    try {
+
+      const res = await api.get(`murid-sesi/${sesiId.value}`)
+      const dataMurid = normalizeStudents(res.data.data || [])
+
+      dataMurid.forEach(m => {
+
+        const existing = allStudents.value.find(s => s.id === m.id)
+
+        if (existing) {
+
+          if (m.status !== null && existing.status !== m.status) {
+            existing.status = m.status
+          }
+
+        } else {
+
+          allStudents.value.push(m)
+
+        }
+
+      })
+
+    } catch (err) {
+
+      console.error("Polling gagal:", err)
+
+    }
+
+  }, 5000)
+
 }
+
+
+// BUKA SESI ABSEN
+const mulaiAbsen = async () => {
+
+  try {
+
+    const response = await api.post('sesi-absen')
+
+    localStorage.setItem('sesi_aktif', JSON.stringify(response.data))
+
+    qrUrl.value = response.data.qr_image
+    sesiId.value = response.data.data.id
+
+    absenAktif.value = true
+    allStudents.value = []
+
+    startPolling()
+
+  } catch (error) {
+
+    console.error("Gagal membuka sesi:", error)
+
+    if (error.response && error.response.data) {
+      alert(error.response.data.message)
+    } else {
+      alert("Kesalahan jaringan")
+    }
+
+  }
+
+}
+
+
+// RESTORE SESSION
+onMounted(() => {
+
+  const savedSession = localStorage.getItem('sesi_aktif')
+
+  if (savedSession) {
+
+    try {
+
+      const data = JSON.parse(savedSession)
+
+      qrUrl.value = data.qr_image
+      sesiId.value = data.data.id
+
+      absenAktif.value = true
+
+      startPolling()
+
+    } catch {
+
+      localStorage.removeItem('sesi_aktif')
+
+    }
+
+  }
+
+})
+
+
+// STOP POLLING
+onUnmounted(() => {
+
+  if (pollingInterval) clearInterval(pollingInterval)
+
+})
+
 </script>
 
 <style scoped>
 /* ===== HEADER ===== */
 .header {
-  --background: linear-gradient(135deg, #E53935, #1b5e20);
+  --background: linear-gradient(135deg, #E53935, #E53935);
   color: white;
 }
 
@@ -134,7 +272,7 @@ function akhiriAbsen() {
   padding: 20px;
   border-radius: 18px;
   background: white;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
   text-align: center;
 }
 
@@ -173,25 +311,112 @@ function akhiriAbsen() {
   color: #999;
 }
 
-/* ===== TIMER ===== */
+/* ===== TIMER & REFRESH TEXT ===== */
 .timer {
   margin-top: 10px;
   color: #2e7d32;
   font-weight: 600;
+  margin-bottom: 5px;
 }
 
-/* ===== MENU ===== */
-.menu {
+.qr-refresh-text {
+  margin: 0;
+  font-size: 11px;
+  color: #f59e0b;
+  font-style: italic;
+  font-weight: 500;
+}
+
+/* ===== STUDENT LIST REALTIME ===== */
+.student-list-section {
   margin: 16px;
-  border-radius: 16px;
+  background: white;
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
   overflow: hidden;
+  padding-bottom: 10px;
 }
 
-.menu ion-item {
-  --border-color: transparent;
+.list-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #f3f4f6;
+  display: flex;
+  align-items: center;
 }
 
-.menu ion-icon {
-  color: #E53935;
+.list-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.badge {
+  background: #e53935;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+.empty-state {
+  padding: 30px 20px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+.student-list {
+  padding: 0;
+  background: transparent;
+}
+
+.student-item {
+  --padding-start: 16px;
+  --inner-padding-end: 16px;
+}
+
+.student-info {
+  flex: 1;
+}
+
+.student-info h2 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 4px;
+}
+
+.student-info p {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.avatar-icon {
+  background: #f3f4f6;
+  padding: 10px;
+  border-radius: 50%;
+  color: #6b7280;
+  margin-right: 15px;
+}
+
+.success-anim {
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>
