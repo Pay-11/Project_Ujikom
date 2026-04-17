@@ -23,13 +23,7 @@
         <!-- CAMERA AREA -->
         <div class="camera-container">
 
-          <video
-            ref="videoRef"
-            autoplay
-            muted
-            playsinline
-            style="width:100%; height:100%; object-fit:cover;"
-          ></video>
+          <video ref="videoRef" autoplay muted playsinline style="width:100%; height:100%; object-fit:cover;"></video>
 
           <div v-if="!isScanning && !scanResult" class="placeholder-overlay">
             <ion-spinner name="crescent" color="success" v-if="isInitializing"></ion-spinner>
@@ -100,7 +94,7 @@ import {
   personOutline
 } from 'ionicons/icons'
 
-import { ref, onMounted, onUnmounted } from "vue"
+import { ref, onUnmounted } from "vue"
 
 import {
   BrowserMultiFormatReader,
@@ -120,60 +114,55 @@ const scannedStudents = ref([])
 let stream = null
 let isProcessing = false
 
-/* ZXING HINT */
+/* ZXING */
 const hints = new Map()
 hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.QR_CODE])
 
 const codeReader = new BrowserMultiFormatReader(hints)
 
 /* ===============================
-   SEND DATA KE BACKEND
+   SEND KE BACKEND (FIXED)
 ================================= */
 const sendToBackend = async (token) => {
-
   try {
     const user = localStorage.getItem("user")
 
     if (!user) {
-      alert("User tidak ditemukan. Silakan login kembali.")
+      alert("User tidak ditemukan. Login ulang.")
       return
     }
 
     const parsedUser = JSON.parse(user)
 
-    const response = await api.post("scan", {
-      token_qr: token
+    const response = await api.post("absensi/scan", {
+      token: token // ✅ FIX
     })
 
     const data = response.data
 
-    const newStudent = { 
+    scannedStudents.value.unshift({
       name: parsedUser.name || "Berhasil absen",
-      id: parsedUser.id 
-    }
-    
-    // Menambah data siswa ke atas list
-    scannedStudents.value.unshift(newStudent)
-    alert(data.message || "Absensi berhasil disimpan!")
+      id: parsedUser.id
+    })
+
+    alert(data.message || "Absensi berhasil!")
 
   } catch (err) {
-    if (err.response && err.response.data) {
-      alert(err.response.data.message || "Gagal absen")
+
+    if (err.response?.data?.message) {
+      alert(err.response.data.message)
     } else {
       console.error(err)
-      alert("Terjadi kesalahan sistem atau gagal menghubungi server")
+      alert("Server error / koneksi gagal")
     }
 
   } finally {
-
     isProcessing = false
-
   }
-
 }
 
 /* ===============================
-   START SCANNER
+   START SCAN
 ================================= */
 const startScanner = async () => {
 
@@ -201,12 +190,12 @@ const startScanner = async () => {
 
           const token = result.getText()
 
-          console.log("QR TERBACA:", token)
+          console.log("QR:", token)
 
           await sendToBackend(token)
 
-          stopScanner()
-
+          // ✅ FIX DELAY biar gak glitch
+          setTimeout(() => stopScanner(), 300)
         }
 
         if (err && !(err instanceof NotFoundException)) {
@@ -221,18 +210,16 @@ const startScanner = async () => {
   } catch (err) {
 
     console.error(err)
-    alert("Izin kamera ditolak atau kamera tidak tersedia")
+    alert("Kamera gak bisa diakses")
 
   } finally {
-
     isInitializing.value = false
-
   }
 
 }
 
 /* ===============================
-   STOP SCANNER
+   STOP SCAN
 ================================= */
 const stopScanner = () => {
 
@@ -248,32 +235,18 @@ const stopScanner = () => {
   }
 
   isScanning.value = false
-
 }
 
 /* ===============================
-   TOGGLE SCAN
+   TOGGLE
 ================================= */
 const toggleScan = () => {
-
-  if (isScanning.value) {
-    stopScanner()
-  } else {
-    startScanner()
-  }
-
+  isScanning.value ? stopScanner() : startScanner()
 }
-
-/* ===============================
-   LIFECYCLE
-================================= */
-
-onMounted(() => {})
 
 onUnmounted(() => {
   stopScanner()
 })
-
 </script>
 
 <style>
@@ -283,7 +256,6 @@ onUnmounted(() => {
 </style>
 
 <style scoped>
-
 /* SEMUA STYLE ANDA TETAP SAMA */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -329,7 +301,7 @@ onUnmounted(() => {
   max-width: 400px;
   padding: 20px 25px;
   border-radius: 20px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
   text-align: center;
   margin-bottom: 30px;
   margin-top: 10px;
@@ -381,7 +353,8 @@ onUnmounted(() => {
 
 .scan-frame-overlay {
   position: absolute;
-  top: 50%; left: 50%;
+  top: 50%;
+  left: 50%;
   transform: translate(-50%, -50%);
   width: 240px;
   height: 240px;
@@ -397,10 +370,33 @@ onUnmounted(() => {
   border-radius: 12px;
 }
 
-.tl { top: 0; left: 0; border-right: none; border-bottom: none; }
-.tr { top: 0; right: 0; border-left: none; border-bottom: none; }
-.bl { bottom: 0; left: 0; border-right: none; border-top: none; }
-.br { bottom: 0; right: 0; border-left: none; border-top: none; }
+.tl {
+  top: 0;
+  left: 0;
+  border-right: none;
+  border-bottom: none;
+}
+
+.tr {
+  top: 0;
+  right: 0;
+  border-left: none;
+  border-bottom: none;
+}
+
+.bl {
+  bottom: 0;
+  left: 0;
+  border-right: none;
+  border-top: none;
+}
+
+.br {
+  bottom: 0;
+  right: 0;
+  border-left: none;
+  border-top: none;
+}
 
 .scan-line {
   position: absolute;
@@ -415,10 +411,23 @@ onUnmounted(() => {
 }
 
 @keyframes scan {
-  0% { top: 5%; opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { top: 95%; opacity: 0; }
+  0% {
+    top: 5%;
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 1;
+  }
+
+  90% {
+    opacity: 1;
+  }
+
+  100% {
+    top: 95%;
+    opacity: 0;
+  }
 }
 
 .scanned-list-container {
@@ -447,7 +456,7 @@ onUnmounted(() => {
   padding: 14px 18px;
   display: flex;
   align-items: center;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
   border-left: 4px solid #10b981;
 }
 
@@ -491,8 +500,15 @@ onUnmounted(() => {
 }
 
 @keyframes slideFadeIn {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .scan-fab {
@@ -511,5 +527,4 @@ onUnmounted(() => {
   font-size: 14px;
   font-weight: 600;
 }
-
 </style>

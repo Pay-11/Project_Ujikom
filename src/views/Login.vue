@@ -128,9 +128,11 @@ const handleLogin = async () => {
     
     localStorage.setItem("token", data.token);
     localStorage.setItem("user", JSON.stringify(data.user || {}));
-    localStorage.setItem("role", role.value); // Simpan role login untuk keperluan frontend
+    localStorage.setItem("role", data.user.role);
+    localStorage.setItem("kelas", JSON.stringify(data.kelas || {}));
+    // Simpan role login untuk keperluan frontend
 
-    if (role.value === 'guru') {
+    if (data.user.role === 'guru') {
       router.push("/guru");
     } else {
       router.push("/home");

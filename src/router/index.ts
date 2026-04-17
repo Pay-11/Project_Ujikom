@@ -17,6 +17,7 @@ import AbsensiManual from '../views/AbsensiManual.vue'
 import PenilaianSikap from '../views/PenilaianSikap.vue'
 import RekapSikap from '../views/RekapSikap.vue'
 import NilaiSikapSiswa from '../views/NilaiSikapSiswa.vue'
+import Poinku from '../views/Poinku.vue'
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -96,6 +97,11 @@ const routes: Array<RouteRecordRaw> = [
     path: '/nilai-sikap-siswa',
     name: 'NilaiSikapSiswa',
     component: NilaiSikapSiswa
+  },
+  {
+    path: '/poinku',
+    name: 'Poinku',
+    component: Poinku
   }
 ]
 

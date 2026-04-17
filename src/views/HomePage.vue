@@ -5,7 +5,7 @@
       <ion-toolbar class="custom-header">
         <div class="user-greeting">
           <div class="avatar-box" @click="goTo('/profile')">
-            <img src="https://ui-avatars.com/api/?name=Egiluy&background=fff&color=e53935" alt="Avatar"/>
+            <img src="https://ui-avatars.com/api/?name=Egiluy&background=fff&color=e53935" alt="Avatar" />
           </div>
           <div class="greeting-text">
             <h2>Hai, EGILUY 👋</h2>
@@ -18,17 +18,37 @@
     <ion-content class="bg-light">
       <div class="header-bg"></div>
 
+      <!-- MY POINTS CARD -->
+      <div class="point-widget" @click="goTo('/poinku')">
+        <div class="point-widget-header">MY POINT</div>
+        <div class="point-widget-body">
+          <div class="point-widget-value">= {{ myPoint }}</div>
+          <div class="point-widget-link">RIWAYAT &rarr;</div>
+        </div>
+      </div>
+
       <!-- ABSENSI HARI INI HERO -->
       <div class="hero-card">
         <div class="hero-header">
           <h3>Absensi Saat Ini</h3>
-          <span class="live-badge">Sedang Berlangsung</span>
+          <span class="live-badge" v-if="jadwalAktif">
+            Sedang Berlangsung
+          </span>
+          <span class="live-badge" v-else style="background:#eee;color:#666;">
+            Tidak Ada
+          </span>
         </div>
-        
+
         <div class="hero-body">
           <div class="subject-main">
-            <h2>Bahasa Indonesia</h2>
-            <p><ion-icon :icon="timeOutline"></ion-icon> 09:30 - 11:50 WIB</p>
+            <h2>{{ jadwalAktif?.mapel || 'Tidak ada kelas' }}</h2>
+            <p>
+              <ion-icon :icon="timeOutline"></ion-icon>
+              {{ jadwalAktif
+                ? jadwalAktif.jam_mulai + ' - ' + jadwalAktif.jam_selesai
+                : '-'
+              }}
+            </p>
           </div>
         </div>
       </div>
@@ -37,7 +57,7 @@
       <div class="menu-container">
         <h4 class="section-title">Menu Utama</h4>
         <div class="menu-grid">
-          
+
           <div class="menu-item" @click="goTo('/jadwal-pelajaran')">
             <div class="icon-wrapper color-red">
               <ion-icon :icon="calendarOutline"></ion-icon>
@@ -76,27 +96,28 @@
           <span class="view-all" @click="goTo('/jadwal-pelajaran')">Lihat Semua</span>
         </div>
 
-        <div class="subject-item done">
-          <div class="subject-icon"><ion-icon :icon="checkmarkCircleOutline"></ion-icon></div>
-          <div class="subject-info">
-            <h4>B. Inggris</h4>
-            <p>Selesai • 07:15 - 08:45</p>
+        <div v-for="item in jadwalHariIni" :key="item.jadwal_id" class="subject-item" :class="{
+          done: item.sudah_absen,
+          active: item.sesi_dibuka && !item.sudah_absen,
+          pending: !item.sesi_dibuka
+        }">
+          <div class="subject-icon">
+            <ion-icon :icon="item.sudah_absen
+              ? checkmarkCircleOutline
+              : item.sesi_dibuka
+                ? bookOutline
+                : lockClosedOutline">
+            </ion-icon>
           </div>
-        </div>
 
-        <div class="subject-item active">
-          <div class="subject-icon"><ion-icon :icon="bookOutline"></ion-icon></div>
           <div class="subject-info">
-            <h4>B. Indonesia</h4>
-            <p>Sedang Berlangsung • 09:30 - 11:50</p>
-          </div>
-        </div>
-
-        <div class="subject-item pending">
-          <div class="subject-icon"><ion-icon :icon="lockClosedOutline"></ion-icon></div>
-          <div class="subject-info">
-            <h4>Matematika</h4>
-            <p>Menunggu • 13:00 - 15:00</p>
+            <h4>{{ item.mapel }}</h4>
+            <p>
+              <span v-if="item.sudah_absen">Selesai</span>
+              <span v-else-if="item.sesi_dibuka">Sedang Berlangsung</span>
+              <span v-else>Menunggu</span>
+              • {{ item.jam_mulai }} - {{ item.jam_selesai }}
+            </p>
           </div>
         </div>
 
@@ -130,19 +151,80 @@
 import {
   IonPage, IonHeader, IonToolbar, IonContent, IonFooter, IonIcon
 } from '@ionic/vue'
+
 import {
-  timeOutline, qrCodeOutline, calendarOutline, 
-  brushOutline, documentTextOutline, bookOutline, lockClosedOutline,
+  timeOutline, calendarOutline,
+  brushOutline, bookOutline, lockClosedOutline,
   checkmarkCircleOutline, home, personOutline, scanOutline, starOutline
 } from 'ionicons/icons'
 
 import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue'
+import api from '../services/api'
 
 const router = useRouter()
 
 const goTo = (path) => {
   router.push(path)
 }
+
+// ======================
+// STATE
+// ======================
+const myPoint = ref(0)
+const jadwalHariIni = ref([])
+const jadwalAktif = ref(null)
+
+// ======================
+// FETCH POINT
+// ======================
+const fetchPoint = async () => {
+  try {
+    const res = await api.get('/point/my')
+    myPoint.value = res.data.point
+  } catch (err) {
+    console.error('Gagal ambil point:', err)
+  }
+}
+
+// ======================
+// FETCH JADWAL
+// ======================
+const fetchJadwal = async () => {
+  try {
+    const res = await api.get('/jadwal/murid-hari-ini')
+    jadwalHariIni.value = res.data.data
+
+    const now = new Date()
+
+    jadwalAktif.value = jadwalHariIni.value.find(j => {
+      const [sh, sm] = j.jam_mulai.split(':')
+      const [eh, em] = j.jam_selesai.split(':')
+
+      const start = new Date()
+      const end = new Date()
+
+      start.setHours(sh, sm)
+      end.setHours(eh, em)
+
+      return now >= start && now <= end
+    })
+
+  } catch (err) {
+    console.error('Gagal ambil jadwal:', err)
+  }
+}
+
+// ======================
+// INIT
+// ======================
+onMounted(() => {
+  fetchPoint()
+  fetchJadwal()
+
+  // auto refresh biar keliatan hidup dikit
+  setInterval(fetchJadwal, 1500000)
+})
 </script>
 
 <style scoped>
@@ -169,8 +251,8 @@ const goTo = (path) => {
   width: 100%;
   height: 100px;
   background: #e53935;
-  border-bottom-left-radius: 30px;
-  border-bottom-right-radius: 30px;
+  border-bottom-left-radius: 0px;
+  border-bottom-right-radius: 0px;
   z-index: 0;
 }
 
@@ -186,8 +268,8 @@ const goTo = (path) => {
   height: 50px;
   border-radius: 50%;
   overflow: hidden;
-  border: 3px solid rgba(255,255,255,0.8);
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  border: 3px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
   cursor: pointer;
 }
 
@@ -211,7 +293,7 @@ const goTo = (path) => {
 .greeting-text p {
   margin: 0;
   font-size: 13px;
-  color: rgba(255,255,255,0.8);
+  color: rgba(255, 255, 255, 0.8);
   font-weight: 500;
 }
 
@@ -219,8 +301,48 @@ const goTo = (path) => {
   font-size: 26px;
   color: white;
   padding: 8px;
-  background: rgba(255,255,255,0.15);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 12px;
+}
+
+/* My Points Widget */
+.point-widget {
+  background: white;
+  margin: 0px 20px 40px;
+  border-radius: 12px;
+  padding: 16px 20px;
+  position: relative;
+  z-index: 10;
+  box-shadow: 0 4px 15px rgba(229, 57, 53, 0.15);
+  border: 2px solid #e53935;
+  cursor: pointer;
+}
+
+.point-widget-header {
+  font-size: 13px;
+  font-weight: 700;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+
+.point-widget-body {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.point-widget-value {
+  font-size: 20px;
+  font-weight: 800;
+  color: #4b5563;
+}
+
+.point-widget-link {
+  font-size: 12px;
+  font-weight: 700;
+  color: #e53935;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 /* Hero Section */
@@ -261,9 +383,17 @@ const goTo = (path) => {
 }
 
 @keyframes pulse {
-  0% { opacity: 1; }
-  50% { opacity: 0.6; }
-  100% { opacity: 1; }
+  0% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.6;
+  }
+
+  100% {
+    opacity: 1;
+  }
 }
 
 .hero-body {
@@ -334,7 +464,8 @@ const goTo = (path) => {
 .menu-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 15px; /* Sedikit dilonggarkan karena ruang lebih luas */
+  gap: 15px;
+  /* Sedikit dilonggarkan karena ruang lebih luas */
   padding: 0 20px;
 }
 
@@ -360,15 +491,29 @@ const goTo = (path) => {
   align-items: center;
   font-size: 26px;
   margin-bottom: 8px;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
   background: white;
 }
 
-.color-red { color: #e53935; }
-.color-orange { color: #f59e0b; }
-.color-green { color: #10b981; }
-.color-gray { color: #6b7280; }
-.color-purple { color: #8b5cf6; }
+.color-red {
+  color: #e53935;
+}
+
+.color-orange {
+  color: #f59e0b;
+}
+
+.color-green {
+  color: #10b981;
+}
+
+.color-gray {
+  color: #6b7280;
+}
+
+.color-purple {
+  color: #8b5cf6;
+}
 
 .menu-item span {
   font-size: 12px;
@@ -409,7 +554,7 @@ const goTo = (path) => {
   padding: 16px;
   border-radius: 16px;
   margin-bottom: 12px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
 }
 
 .subject-icon {
@@ -435,15 +580,36 @@ const goTo = (path) => {
   font-weight: 500;
 }
 
-.subject-item.done .subject-icon { background: #d1fae5; color: #10b981; }
-.subject-item.done .subject-info p { color: #10b981; }
+.subject-item.done .subject-icon {
+  background: #d1fae5;
+  color: #10b981;
+}
 
-.subject-item.active { border-left: 4px solid #e53935; }
-.subject-item.active .subject-icon { background: #fee2e2; color: #e53935; }
-.subject-item.active .subject-info p { color: #e53935; }
+.subject-item.done .subject-info p {
+  color: #10b981;
+}
 
-.subject-item.pending .subject-icon { background: #f3f4f6; color: #9ca3af; }
-.subject-item.pending .subject-info p { color: #9ca3af; }
+.subject-item.active {
+  border-left: 4px solid #e53935;
+}
+
+.subject-item.active .subject-icon {
+  background: #fee2e2;
+  color: #e53935;
+}
+
+.subject-item.active .subject-info p {
+  color: #e53935;
+}
+
+.subject-item.pending .subject-icon {
+  background: #f3f4f6;
+  color: #9ca3af;
+}
+
+.subject-item.pending .subject-info p {
+  color: #9ca3af;
+}
 
 /* Bottom Navbar */
 .bottom-nav {
@@ -453,7 +619,7 @@ const goTo = (path) => {
   align-items: flex-end;
   height: 65px;
   padding-bottom: 10px;
-  box-shadow: 0 -10px 20px rgba(0,0,0,0.03);
+  box-shadow: 0 -10px 20px rgba(0, 0, 0, 0.03);
   position: relative;
 }
 

@@ -1,0 +1,1 @@
+sdk.dir=C:\\Users\\Rivaldy\\AppData\\Local\\Android\\Sdk

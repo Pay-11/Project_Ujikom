@@ -90,9 +90,7 @@ import {
   IonItem,
   IonIcon,
   IonButtons,
-  IonBackButton,
-  IonSelect,
-  IonSelectOption
+  IonBackButton
 } from '@ionic/vue'
 
 import { personOutline } from 'ionicons/icons'
@@ -107,14 +105,16 @@ const isLoading = ref(true)
 
 let pollingInterval = null
 
-
-// FILTER SISWA YANG SUDAH ABSEN
+// ======================
+// FILTER SISWA HADIR
+// ======================
 const siswaAbsen = computed(() => {
   return allStudents.value.filter(s => s.status !== null)
 })
 
-
+// ======================
 // NORMALIZE DATA
+// ======================
 const normalizeStudents = (data) => {
 
   if (!Array.isArray(data) && typeof data === 'object') {
@@ -126,11 +126,11 @@ const normalizeStudents = (data) => {
     name: m.name,
     status: m.status
   }))
-
 }
 
-
-// POLLING DATA ABSENSI
+// ======================
+// POLLING (FIX ENDPOINT)
+// ======================
 const startPolling = async () => {
 
   if (pollingInterval) clearInterval(pollingInterval)
@@ -138,26 +138,20 @@ const startPolling = async () => {
   isLoading.value = true
 
   try {
-
-    const res = await api.get(`murid-sesi/${sesiId.value}`)
-
+    const res = await api.get(`absensi/murid-sesi/${sesiId.value}`)
     allStudents.value = normalizeStudents(res.data.data || [])
-
   } catch (err) {
-
     console.error("Gagal memuat data murid:", err)
-
   } finally {
-
     isLoading.value = false
-
   }
 
   pollingInterval = setInterval(async () => {
 
     try {
 
-      const res = await api.get(`murid-sesi/${sesiId.value}`)
+      const res = await api.get(`absensi/murid-sesi/${sesiId.value}`)
+
       const dataMurid = normalizeStudents(res.data.data || [])
 
       dataMurid.forEach(m => {
@@ -165,41 +159,43 @@ const startPolling = async () => {
         const existing = allStudents.value.find(s => s.id === m.id)
 
         if (existing) {
-
           if (m.status !== null && existing.status !== m.status) {
             existing.status = m.status
           }
-
         } else {
-
           allStudents.value.push(m)
-
         }
 
       })
 
     } catch (err) {
-
       console.error("Polling gagal:", err)
-
     }
 
   }, 5000)
 
 }
 
-
-// BUKA SESI ABSEN
+// ======================
+// MULAI ABSEN
+// ======================
 const mulaiAbsen = async () => {
 
   try {
 
-    const response = await api.post('sesi-absen')
+    const response = await api.post('absensi/sesi')
+    const data = response.data
 
-    localStorage.setItem('sesi_aktif', JSON.stringify(response.data))
+    const sessionData = {
+      sesi_id: data.sesi_id,
+      qr_image: data.qr_image,
+      started_at: new Date().toISOString()
+    }
 
-    qrUrl.value = response.data.qr_image
-    sesiId.value = response.data.data.id
+    localStorage.setItem('sesi_aktif', JSON.stringify(sessionData))
+
+    qrUrl.value = sessionData.qr_image
+    sesiId.value = sessionData.sesi_id
 
     absenAktif.value = true
     allStudents.value = []
@@ -220,41 +216,55 @@ const mulaiAbsen = async () => {
 
 }
 
-
+// ======================
 // RESTORE SESSION
+// ======================
 onMounted(() => {
 
   const savedSession = localStorage.getItem('sesi_aktif')
 
-  if (savedSession) {
+  if (!savedSession) return
 
-    try {
+  try {
 
-      const data = JSON.parse(savedSession)
+    const data = JSON.parse(savedSession)
 
-      qrUrl.value = data.qr_image
-      sesiId.value = data.data.id
-
-      absenAktif.value = true
-
-      startPolling()
-
-    } catch {
-
+    // VALIDASI DATA
+    if (!data.sesi_id || !data.qr_image) {
       localStorage.removeItem('sesi_aktif')
-
+      return
     }
 
+    // OPTIONAL EXPIRE (2 JAM)
+    const now = new Date()
+    const start = new Date(data.started_at)
+
+    const diffMinutes = (now - start) / 1000 / 60
+
+    if (diffMinutes > 120) {
+      localStorage.removeItem('sesi_aktif')
+      return
+    }
+
+    qrUrl.value = data.qr_image
+    sesiId.value = data.sesi_id
+
+    absenAktif.value = true
+
+    startPolling()
+
+  } catch (err) {
+    console.error("Session rusak:", err)
+    localStorage.removeItem('sesi_aktif')
   }
 
 })
 
-
+// ======================
 // STOP POLLING
+// ======================
 onUnmounted(() => {
-
   if (pollingInterval) clearInterval(pollingInterval)
-
 })
 
 </script>
