@@ -15,31 +15,31 @@
       <!-- Profile Header -->
       <div class="profile-header">
         <div class="avatar-container">
-          <img src="https://ui-avatars.com/api/?name=Luddi&background=fff&color=e53935&size=150" alt="Avatar"/>
+          <img :src="`https://ui-avatars.com/api/?name=${user?.name}&background=fff&color=e53935&size=150`" />
           <button class="edit-avatar">
             <ion-icon :icon="cameraOutline"></ion-icon>
           </button>
         </div>
-        
-        <h2 class="teacher-name">PA LUDDI</h2>
-        <p class="teacher-position">Guru Ahli Pertama - Produktif RPL</p>
-        <span class="teacher-nip">NIP. 198001012010011001</span>
+
+        <h2 class="teacher-name">{{ user?.name }}</h2>
+        <p class="teacher-position">Guru - {{ user?.role }}</p>
+        <span class="teacher-nip">NIP. {{ user?.nip || '-' }}</span>
       </div>
 
       <!-- Action Cards -->
       <div class="action-list">
-        <div class="action-item">
+        <div class="action-item" @click="router.push('/informasi-akun')">
           <div class="action-icon">
             <ion-icon :icon="personOutline"></ion-icon>
           </div>
           <div class="action-text">
-            <h4>Data Kepegawaian</h4>
+            <h4>Informasi Akun</h4>
             <p>Informasi detail diri & NUPTK</p>
           </div>
           <ion-icon :icon="chevronForwardOutline" class="go-icon"></ion-icon>
         </div>
 
-        <div class="action-item">
+        <div class="action-item" @click="router.push('/keamanan-akun')">
           <div class="action-icon">
             <ion-icon :icon="lockClosedOutline"></ion-icon>
           </div>
@@ -50,17 +50,6 @@
           <ion-icon :icon="chevronForwardOutline" class="go-icon"></ion-icon>
         </div>
 
-        <div class="action-item">
-          <div class="action-icon">
-            <ion-icon :icon="settingsOutline"></ion-icon>
-          </div>
-          <div class="action-text">
-            <h4>Pengaturan Aplikasi</h4>
-            <p>Notifikasi sistem</p>
-          </div>
-          <ion-icon :icon="chevronForwardOutline" class="go-icon"></ion-icon>
-        </div>
-        
         <div class="action-item logout" @click="handleLogout">
           <div class="action-icon logout-icon">
             <ion-icon :icon="logOutOutline"></ion-icon>
@@ -77,16 +66,34 @@
 
 <script setup>
 import {
-  IonPage, IonHeader, IonToolbar, IonButtons, IonBackButton, 
+  IonPage, IonHeader, IonToolbar, IonButtons, IonBackButton,
   IonTitle, IonContent, IonIcon
 } from '@ionic/vue'
-import { 
-  cameraOutline, personOutline, lockClosedOutline, 
-  settingsOutline, logOutOutline, chevronForwardOutline 
+import {
+  cameraOutline, personOutline, lockClosedOutline,
+  settingsOutline, logOutOutline, chevronForwardOutline
 } from 'ionicons/icons'
 import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue'
+import api from '@/services/api'
+
+const user = ref(null)
 
 const router = useRouter()
+
+
+const getProfile = async () => {
+  try {
+    const res = await api.get('/me')
+    user.value = res.data.data
+  } catch (err) {
+    console.error(err)
+  }
+}
+
+onMounted(() => {
+  getProfile()
+})
 
 const handleLogout = () => {
   localStorage.clear()
@@ -145,7 +152,7 @@ const handleLogout = () => {
   height: 100%;
   border-radius: 50%;
   border: 4px solid white;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
   object-fit: cover;
 }
 
@@ -161,7 +168,7 @@ const handleLogout = () => {
   display: flex;
   justify-content: center;
   align-items: center;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
   color: #e53935;
   font-size: 20px;
   cursor: pointer;
@@ -205,7 +212,7 @@ const handleLogout = () => {
   display: flex;
   align-items: center;
   gap: 16px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
   transition: transform 0.2s;
 }
 

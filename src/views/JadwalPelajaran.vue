@@ -15,13 +15,8 @@
       <!-- Days Filter -->
       <div class="filter-wrapper">
         <div class="days-scroll">
-          <div 
-            v-for="(day, index) in days" 
-            :key="index"
-            class="day-chip"
-            :class="{ active: selectedDay === day }"
-            @click="selectedDay = day"
-          >
+          <div v-for="(day, index) in days" :key="index" class="day-chip" :class="{ active: selectedDay === day }"
+            @click="selectedDay = day">
             {{ day }}
           </div>
         </div>
@@ -29,20 +24,16 @@
 
       <!-- Schedule Content -->
       <div class="schedule-container">
-        <h2 class="sub-title">Jadwal Kelas XII RPL 2</h2>
-        
+        <h2 class="sub-title">Jadwal Mingguan</h2>
+
         <div class="timeline">
           <!-- Item loop -->
-          <div 
-            class="timeline-item" 
-            v-for="(subject, idx) in currentSchedule" 
-            :key="idx"
-          >
+          <div class="timeline-item" v-for="(subject, idx) in currentSchedule" :key="idx">
             <div class="time-column">
               <span class="start-time">{{ subject.start }}</span>
               <span class="end-time">{{ subject.end }}</span>
             </div>
-            
+
             <div class="card-column">
               <div class="subject-card" :class="'color-' + (idx % 4)">
                 <div class="card-header">
@@ -58,17 +49,17 @@
                   </div>
                   <div class="room-info">
                     <ion-icon :icon="locationOutline"></ion-icon>
-                    <span>Ruang {{ subject.room }}</span>
+                    <span>{{ subject.room }}</span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-          
+
           <!-- Empty State -->
           <div v-if="currentSchedule.length === 0" class="empty-state">
             <ion-icon :icon="calendarClearOutline"></ion-icon>
-            <p>Tidak ada jadwal pelajaran untuk hari ini.</p>
+            <p>Tidak ada jadwal pelajaran.</p>
           </div>
         </div>
       </div>
@@ -77,56 +68,74 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import {
-  IonPage, IonHeader, IonToolbar, IonButtons, IonBackButton, 
+  IonPage, IonHeader, IonToolbar, IonButtons, IonBackButton,
   IonTitle, IonContent, IonIcon, IonAvatar
 } from '@ionic/vue'
 import { bookOutline, locationOutline, calendarClearOutline } from 'ionicons/icons'
+import api from '@/services/api'
 
-const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat']
+// ======================
+// STATE
+// ======================
+const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
 const selectedDay = ref('Senin')
+const scheduleData = ref({})
 
-// Dummy data for schedule
-const scheduleData = {
-  'Senin': [
-    { name: 'Upacara Bendera', start: '07:00', end: '08:00', teacher: 'Semua Guru', room: 'Lapangan' },
-    { name: 'Matematika', start: '08:00', end: '10:00', teacher: 'Budi Santoso', room: '201' },
-    { name: 'Istirahat', start: '10:00', end: '10:30', teacher: '-', room: 'Kantin' },
-    { name: 'Pemrograman Web', start: '10:30', end: '13:00', teacher: 'Rina Wijaya', room: 'Lab Komputer 1' },
-    { name: 'Istirahat / Ishoma', start: '13:00', end: '13:30', teacher: '-', room: 'Masjid/Kantin' },
-    { name: 'Pendidikan Agama', start: '13:30', end: '15:30', teacher: 'Ahmad Fauzi', room: '201' },
-  ],
-  'Selasa': [
-    { name: 'Bahasa Indonesia', start: '07:00', end: '09:00', teacher: 'Siti Aminah', room: '201' },
-    { name: 'Basis Data', start: '09:00', end: '11:00', teacher: 'Hendra Saputra', room: 'Lab Komputer 2' },
-    { name: 'Istirahat / Ishoma', start: '11:00', end: '12:00', teacher: '-', room: 'Kantin' },
-    { name: 'PBO (Java)', start: '12:00', end: '15:30', teacher: 'Herman Malik', room: 'Lab Komputer 2' },
-  ],
-  'Rabu': [
-    { name: 'Bahasa Inggris', start: '07:00', end: '09:00', teacher: 'Mrs. Ani', room: '201' },
-    { name: 'Sejarah Indonesia', start: '09:00', end: '11:00', teacher: 'Drs. Supriadi', room: '201' },
-    { name: 'Istirahat / Ishoma', start: '11:00', end: '12:00', teacher: '-', room: 'Kantin' },
-    { name: 'Pemrograman Mobile', start: '12:00', end: '15:30', teacher: 'Reza Rahadian', room: 'Lab Komputer 3' },
-  ],
-  'Kamis': [
-    { name: 'Seni Budaya', start: '07:00', end: '09:00', teacher: 'Nia Ramadhani', room: 'Ruang Kesenian' },
-    { name: 'Penjasorkes', start: '09:00', end: '11:00', teacher: 'Junaidi, S.Pd', room: 'Lapangan Bola' },
-    { name: 'Istirahat / Ishoma', start: '11:00', end: '12:00', teacher: '-', room: 'Kantin' },
-    { name: 'Produk Kreatif & KWU', start: '12:00', end: '15:30', teacher: 'Dina Mariana', room: '201' },
-  ],
-  'Jumat': [
-    { name: 'Senam Pagi / Rohis', start: '07:00', end: '08:00', teacher: 'Tim Guru', room: 'Lapangan / Masjid' },
-    { name: 'Matematika Peminatan', start: '08:00', end: '09:30', teacher: 'Budi Santoso', room: '201' },
-    { name: 'Istirahat', start: '09:30', end: '10:00', teacher: '-', room: 'Kantin' },
-    { name: 'UI/UX Design', start: '10:00', end: '11:30', teacher: 'Arif Budi', room: 'Lab Multimedia' },
-    { name: 'Shalat Jumat / Keputrian', start: '11:30', end: '13:00', teacher: '-', room: 'Masjid/Aula' },
-    { name: 'Bimbingan Konseling', start: '13:00', end: '15:30', teacher: 'Dra. Yuli', room: '201' },
-  ]
+// ======================
+// HELPER
+// ======================
+const capitalize = (text) => {
+  return text.charAt(0).toUpperCase() + text.slice(1)
 }
 
+// ======================
+// FETCH API
+// ======================
+const fetchSchedule = async () => {
+  try {
+    const res = await api.get('jadwal/murid-mingguan')
+
+    const result = {}
+
+    res.data.data.forEach(day => {
+      const namaHari = capitalize(day.hari)
+
+      result[namaHari] = day.jadwal.map(j => ({
+        name: j.mapel,
+        start: j.jam_mulai,
+        end: j.jam_selesai,
+        teacher: j.guru,
+        room: j.kelas // backend belum ada ruang, jadi pake kelas dulu
+      }))
+    })
+
+    scheduleData.value = result
+
+    // auto set hari sekarang
+    const today = capitalize(new Date().toLocaleDateString('id-ID', { weekday: 'long' }))
+    if (result[today]) {
+      selectedDay.value = today
+    }
+
+  } catch (err) {
+    console.error('Gagal ambil jadwal:', err)
+  }
+}
+
+// ======================
+// COMPUTED
+// ======================
 const currentSchedule = computed(() => {
-  return scheduleData[selectedDay.value] || []
+  return scheduleData.value[selectedDay.value] || []
+})
+
+// ======================
+// INIT
+// ======================
+onMounted(() => {
+  fetchSchedule()
 })
 </script>
 
@@ -171,10 +180,13 @@ const currentSchedule = computed(() => {
   overflow-x: auto;
   padding: 0 20px;
   gap: 12px;
-  scrollbar-width: none; /* Firefox */
+  scrollbar-width: none;
+  /* Firefox */
 }
+
 .days-scroll::-webkit-scrollbar {
-  display: none; /* Safari and Chrome */
+  display: none;
+  /* Safari and Chrome */
 }
 
 .day-chip {
@@ -185,7 +197,7 @@ const currentSchedule = computed(() => {
   font-weight: 600;
   font-size: 14px;
   white-space: nowrap;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
   transition: all 0.3s ease;
   border: 1px solid #f3f4f6;
 }
@@ -277,14 +289,15 @@ const currentSchedule = computed(() => {
 
 .card-column {
   flex: 1;
-  padding-left: 14px; /* Space for the timeline dot */
+  padding-left: 14px;
+  /* Space for the timeline dot */
 }
 
 .subject-card {
   background: white;
   border-radius: 16px;
   padding: 16px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.04);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
   position: relative;
   overflow: hidden;
 }
@@ -298,10 +311,21 @@ const currentSchedule = computed(() => {
   height: 100%;
 }
 
-.color-0::before { background: #e53935; }
-.color-1::before { background: #3b82f6; }
-.color-2::before { background: #10b981; }
-.color-3::before { background: #f59e0b; }
+.color-0::before {
+  background: #e53935;
+}
+
+.color-1::before {
+  background: #3b82f6;
+}
+
+.color-2::before {
+  background: #10b981;
+}
+
+.color-3::before {
+  background: #f59e0b;
+}
 
 .card-header {
   display: flex;
@@ -328,7 +352,8 @@ const currentSchedule = computed(() => {
   gap: 10px;
 }
 
-.teacher-info, .room-info {
+.teacher-info,
+.room-info {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -339,7 +364,8 @@ const currentSchedule = computed(() => {
   height: 24px;
 }
 
-.teacher-name, .room-info span {
+.teacher-name,
+.room-info span {
   font-size: 13px;
   font-weight: 500;
   color: #6b7280;

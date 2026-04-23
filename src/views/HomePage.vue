@@ -65,13 +65,6 @@
             <span>Jadwal<br>Pelajaran</span>
           </div>
 
-          <div class="menu-item" @click="goTo('/jadwal-piket')">
-            <div class="icon-wrapper color-orange">
-              <ion-icon :icon="brushOutline"></ion-icon>
-            </div>
-            <span>Jadwal<br>Piket</span>
-          </div>
-
           <div class="menu-item" @click="goTo('/riwayat-absensi')">
             <div class="icon-wrapper color-green">
               <ion-icon :icon="timeOutline"></ion-icon>
@@ -154,7 +147,7 @@ import {
 
 import {
   timeOutline, calendarOutline,
-  brushOutline, bookOutline, lockClosedOutline,
+  bookOutline, lockClosedOutline,
   checkmarkCircleOutline, home, personOutline, scanOutline, starOutline
 } from 'ionicons/icons'
 
@@ -463,9 +456,8 @@ onMounted(() => {
 
 .menu-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 15px;
-  /* Sedikit dilonggarkan karena ruang lebih luas */
   padding: 0 20px;
 }
 

@@ -19,34 +19,37 @@
             <ion-icon :icon="checkmarkCircleOutline"></ion-icon>
           </div>
           <div class="stat-info">
-            <h4>12</h4>
+            <h4>{{ stats.hadir }}</h4>
             <p>Hadir</p>
           </div>
         </div>
+
         <div class="stat-card sakit">
           <div class="stat-icon">
             <ion-icon :icon="medkitOutline"></ion-icon>
           </div>
           <div class="stat-info">
-            <h4>1</h4>
+            <h4>{{ stats.sakit }}</h4>
             <p>Sakit</p>
           </div>
         </div>
+
         <div class="stat-card izin">
           <div class="stat-icon">
             <ion-icon :icon="documentTextOutline"></ion-icon>
           </div>
           <div class="stat-info">
-            <h4>1</h4>
+            <h4>{{ stats.izin }}</h4>
             <p>Izin</p>
           </div>
         </div>
+
         <div class="stat-card alfa">
           <div class="stat-icon">
             <ion-icon :icon="closeCircleOutline"></ion-icon>
           </div>
           <div class="stat-info">
-            <h4>0</h4>
+            <h4>{{ stats.alpha }}</h4>
             <p>Alfa</p>
           </div>
         </div>
@@ -56,15 +59,10 @@
       <div class="history-container">
         <div class="history-header">
           <h3>Minggu Terakhir</h3>
-          <span class="filter">Filter <ion-icon :icon="filterOutline"></ion-icon></span>
         </div>
 
         <div class="history-list">
-          <div 
-            v-for="(item, idx) in historyData" 
-            :key="idx"
-            class="history-item"
-          >
+          <div v-for="(item, idx) in historyData" :key="idx" class="history-item">
             <div class="date-col">
               <span class="day">{{ item.day }}</span>
               <span class="date">{{ item.date }}</span>
@@ -73,12 +71,21 @@
             <div class="detail-col">
               <div class="subject-info">
                 <h4>{{ item.subject }}</h4>
-                <p><ion-icon :icon="timeOutline"></ion-icon> {{ item.time }}</p>
+                <p>
+                  <ion-icon :icon="timeOutline"></ion-icon>
+                  {{ item.time }}
+                </p>
               </div>
+
               <div class="status-badge" :class="item.status.toLowerCase()">
                 {{ item.status }}
               </div>
             </div>
+          </div>
+
+          <!-- EMPTY STATE -->
+          <div v-if="historyData.length === 0" style="text-align:center; padding:20px; color:#888;">
+            Belum ada riwayat... hidupmu masih bersih ✨
           </div>
         </div>
       </div>
@@ -88,26 +95,75 @@
 
 <script setup>
 import {
-  IonPage, IonHeader, IonToolbar, IonButtons, IonBackButton, 
+  IonPage, IonHeader, IonToolbar, IonButtons, IonBackButton,
   IonTitle, IonContent, IonIcon
 } from '@ionic/vue'
-import { 
-  checkmarkCircleOutline, medkitOutline, closeCircleOutline, 
-  filterOutline, timeOutline, documentTextOutline
+
+import {
+  checkmarkCircleOutline,
+  medkitOutline,
+  closeCircleOutline,
+  filterOutline,
+  timeOutline,
+  documentTextOutline
 } from 'ionicons/icons'
 
-// Dummy Data
-const historyData = [
-  { day: 'Jum', date: '25 Okt', subject: 'Matematika Peminatan', time: '08:00 WIB', status: 'Hadir' },
-  { day: 'Kam', date: '24 Okt', subject: 'Seni Budaya', time: '07:10 WIB', status: 'Hadir' },
-  { day: 'Kam', date: '24 Okt', subject: 'Produk Kreatif', time: '10:35 WIB', status: 'Hadir' },
-  { day: 'Rab', date: '23 Okt', subject: 'Pemrograman Mobile', time: '10:30 WIB', status: 'Izin' },
-  { day: 'Rab', date: '23 Okt', subject: 'Bahasa Inggris', time: '07:05 WIB', status: 'Hadir' },
-  { day: 'Sel', date: '22 Okt', subject: 'Basis Data', time: '08:35 WIB', status: 'Hadir' },
-  { day: 'Sel', date: '22 Okt', subject: 'Bahasa Indonesia', time: '07:15 WIB', status: 'Sakit' },
-  { day: 'Sen', date: '21 Okt', subject: 'Pemrograman Web', time: '10:05 WIB', status: 'Hadir' },
-  { day: 'Sen', date: '21 Okt', subject: 'Matematika', time: '08:00 WIB', status: 'Hadir' },
-]
+import { ref, onMounted } from "vue"
+import api from "@/services/api"
+
+const historyData = ref([])
+
+const stats = ref({
+  hadir: 0,
+  sakit: 0,
+  izin: 0,
+  alpha: 0
+})
+
+const fetchRiwayat = async () => {
+  try {
+    const res = await api.get("/absensi/riwayat")
+    let data = res.data.data || []
+
+    // sort terbaru dulu (biar keliatan pinter dikit)
+    data.sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal))
+
+    historyData.value = data.map(item => {
+      const dateObj = new Date(item.tanggal)
+
+      return {
+        day: dateObj.toLocaleDateString("id-ID", { weekday: "short" }),
+        date: dateObj.toLocaleDateString("id-ID", { day: "2-digit", month: "short" }),
+        subject: item.mapel ?? "-",
+        time: item.jam_mulai
+          ? item.jam_mulai.slice(0, 5) + " WIB"
+          : "-",
+        status: capitalize(item.status)
+      }
+    })
+
+    // stats
+    stats.value = {
+      hadir: data.filter(i => i.status === "hadir").length,
+      sakit: data.filter(i => i.status === "sakit").length,
+      izin: data.filter(i => i.status === "izin").length,
+      alpha: data.filter(i => i.status === "alpha").length
+    }
+
+  } catch (err) {
+    console.error("API error:", err)
+
+    // bonus biar gak bengong kosong
+    historyData.value = []
+  }
+}
+
+const capitalize = (text) => {
+  if (!text) return "-"
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
+onMounted(fetchRiwayat)
 </script>
 
 <style scoped>
@@ -157,7 +213,7 @@ const historyData = [
   display: flex;
   flex-direction: column;
   align-items: center;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06);
   transition: transform 0.2s;
 }
 
@@ -176,10 +232,25 @@ const historyData = [
   margin-bottom: 8px;
 }
 
-.stat-card.hadir .stat-icon { background: #d1fae5; color: #10b981; }
-.stat-card.sakit .stat-icon { background: #fef3c7; color: #f59e0b; }
-.stat-card.izin .stat-icon { background: #dbeafe; color: #3b82f6; }
-.stat-card.alfa .stat-icon { background: #fee2e2; color: #ef4444; }
+.stat-card.hadir .stat-icon {
+  background: #d1fae5;
+  color: #10b981;
+}
+
+.stat-card.sakit .stat-icon {
+  background: #fef3c7;
+  color: #f59e0b;
+}
+
+.stat-card.izin .stat-icon {
+  background: #dbeafe;
+  color: #3b82f6;
+}
+
+.stat-card.alfa .stat-icon {
+  background: #fee2e2;
+  color: #ef4444;
+}
 
 .stat-info {
   text-align: center;
@@ -240,7 +311,7 @@ const historyData = [
   background: white;
   border-radius: 16px;
   padding: 16px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.02);
 }
 
 .date-col {
@@ -298,8 +369,23 @@ const historyData = [
   font-weight: 700;
 }
 
-.status-badge.hadir { background: #d1fae5; color: #10b981; }
-.status-badge.izin { background: #dbeafe; color: #3b82f6; }
-.status-badge.sakit { background: #fef3c7; color: #f59e0b; }
-.status-badge.alfa { background: #fee2e2; color: #ef4444; }
+.status-badge.hadir {
+  background: #d1fae5;
+  color: #10b981;
+}
+
+.status-badge.izin {
+  background: #dbeafe;
+  color: #3b82f6;
+}
+
+.status-badge.sakit {
+  background: #fef3c7;
+  color: #f59e0b;
+}
+
+.status-badge.alfa {
+  background: #fee2e2;
+  color: #ef4444;
+}
 </style>

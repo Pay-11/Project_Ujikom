@@ -207,7 +207,6 @@
 
 
 <script setup>
-
 import { ref, computed, onMounted } from "vue"
 import api from "../services/api"
 import Chart from "chart.js/auto"
@@ -227,39 +226,34 @@ import {
 
 import { closeOutline } from "ionicons/icons"
 
-
 const classes = ref([])
 const studentsList = ref([])
 const selectedClass = ref("")
 const tahunAjarId = ref(null)
 
 const historyData = ref([])
-
 const showModal = ref(false)
 const activeStudent = ref(null)
-const selectedPeriod = ref('')
+const selectedPeriod = ref("")
 
 const categoryAverages = ref([])
 const overallAverage = ref(0)
 
 let radarChart = null
 
+// =====================
+// 📊 CHART
+// =====================
 const renderChart = () => {
-
   const ctx = document.getElementById("radarChart")
-
   if (!ctx) return
 
   if (radarChart) radarChart.destroy()
 
   radarChart = new Chart(ctx, {
-
     type: "radar",
-
     data: {
-
       labels: categoryAverages.value.map(c => c.category),
-
       datasets: [
         {
           label: "Nilai Sikap",
@@ -267,58 +261,46 @@ const renderChart = () => {
           fill: true
         }
       ]
-
     },
-
     options: {
-
       scales: {
         r: {
           suggestedMin: 0,
           suggestedMax: 5
         }
       }
-
     }
-
   })
-
 }
 
-
+// =====================
+// 📅 BULAN
+// =====================
 const pastMonths = computed(() => {
-
   const months = []
   const date = new Date()
 
-  const formatOpt = { month: 'long', year: 'numeric' }
-
   for (let i = 0; i < 4; i++) {
-
     const d = new Date(date.getFullYear(), date.getMonth() - i, 1)
 
-    const label = d.toLocaleDateString('id-ID', formatOpt)
-
-    const valueStr =
-      `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-01`
-
     months.push({
-      label,
-      value: valueStr
+      label: d.toLocaleDateString("id-ID", { month: "long", year: "numeric" }),
+      value: `${d.getFullYear()}-${(d.getMonth() + 1)
+        .toString()
+        .padStart(2, "0")}-01`
     })
-
   }
 
   return months
 })
 
+// =====================
+// 👨‍🎓 LOAD SISWA
+// =====================
 const loadStudents = async () => {
+  if (!selectedClass.value) return
 
-  if (!selectedClass.value || !selectedPeriod.value) return
-
-  const res = await api.get(
-    `murid-kelas/${selectedClass.value}?period=${selectedPeriod.value.slice(0, 7)}`
-  )
+  const res = await api.get(`akademik/murid-kelas/${selectedClass.value}`)
 
   studentsList.value = res.data.data.map(s => ({
     ...s,
@@ -326,70 +308,50 @@ const loadStudents = async () => {
   }))
 }
 
-
-
-
-
-
+// =====================
+// 📚 LOAD DATA AWAL
+// =====================
 const loadTahunAjar = async () => {
-
-  const res = await api.get("tahun-ajar")
-
+  const res = await api.get("akademik/tahun-ajar")
   const aktif = res.data.data.find(t => t.aktif)
-
   tahunAjarId.value = aktif.id
-
 }
-
-
 
 const loadClasses = async () => {
-
-  const res = await api.post("kelas", {
+  const res = await api.post("akademik/kelas", {
     tahun_ajar_id: tahunAjarId.value
   })
-
   classes.value = res.data.data
-
 }
 
-
-
-const onClassChange = async () => {
-
-  const res = await api.get(
-    `murid-kelas/${selectedClass.value}?period=2026-03`
-  )
-
-  studentsList.value = res.data.data.map(s => ({
-    ...s,
-    class_name:
-      classes.value.find(c => c.id == selectedClass.value)?.nama_kelas
-  }))
-
-}
-
-
-
+// =====================
+// 🧠 FILTER
+// =====================
 const filteredStudents = computed(() => {
-
   if (!selectedClass.value) return []
-
   return studentsList.value
-
 })
 
-
-
+// =====================
+// 🔥 OPEN MODAL (FIX BESAR)
+// =====================
 const openModal = async (student) => {
-
   activeStudent.value = student
 
+  const yearMonth = selectedPeriod.value.slice(0, 7)
+
+  const startDate = `${yearMonth}-01`
+  const endDate = new Date(yearMonth + "-01")
+  endDate.setMonth(endDate.getMonth() + 1)
+  endDate.setDate(0)
+
+  const endDateStr = endDate.toISOString().slice(0, 10)
+
   const res = await api.get(
-    `nilai-murid/${student.id}?period=${selectedPeriod.value.slice(0, 7)}`
+    `assessment/murid/${student.id}?start_date=${startDate}&end_date=${endDateStr}`
   )
 
-  const data = res.data.data
+  const data = res.data.data || []
 
   if (data.length === 0) {
     historyData.value = []
@@ -399,42 +361,42 @@ const openModal = async (student) => {
     return
   }
 
-  const details = data[0].details
-
+  // =====================
+  // 📊 CATEGORY AVG
+  // =====================
+  const details = data[0].details || []
   const catMap = {}
 
   details.forEach(d => {
-
     if (!catMap[d.category.name]) {
       catMap[d.category.name] = []
     }
-
     catMap[d.category.name].push(d.score)
-
   })
 
   categoryAverages.value = Object.keys(catMap).map(name => {
-
     const scores = catMap[name]
-
-    const avg =
-      scores.reduce((a, b) => a + b, 0) / scores.length
+    const avg = scores.reduce((a, b) => a + b, 0) / scores.length
 
     return {
       category: name,
       avg: Number(avg.toFixed(2))
     }
-
   })
 
+  // =====================
+  // 📈 OVERALL
+  // =====================
   overallAverage.value =
     categoryAverages.value.reduce((a, b) => a + b.avg, 0) /
     categoryAverages.value.length
 
   overallAverage.value = Number(overallAverage.value.toFixed(2))
 
+  // =====================
+  // 📜 HISTORY
+  // =====================
   historyData.value = data.map(item => {
-
     const avg =
       item.details.reduce((a, b) => a + b.score, 0) /
       item.details.length
@@ -447,74 +409,62 @@ const openModal = async (student) => {
     else sikap = "Kurang"
 
     return {
-      period_label: item.period,
+      period_label: item.tanggal, // 🔥 FIX (bukan period)
       sikap,
-      keterangan: item.general_notes
+      keterangan: item.catatan
     }
-
   })
 
   showModal.value = true
-
   setTimeout(renderChart, 200)
-
 }
 
-
-
+// =====================
+// ❌ CLOSE MODAL
+// =====================
 const closeModal = () => {
-
   showModal.value = false
   activeStudent.value = null
   historyData.value = []
-
 }
 
-
-
+// =====================
+// 🎨 UI HELPER
+// =====================
 const getBadgeClass = (sikap) => {
-
   if (sikap.includes("Baik")) return "b-green"
   if (sikap.includes("Cukup")) return "b-yellow"
   return "b-red"
-
 }
 
-
-
 const getDotClass = (sikap) => {
-
   if (sikap.includes("Baik")) return "dot-green"
   if (sikap.includes("Cukup")) return "dot-yellow"
   return "dot-red"
-
 }
 
-
-
+// =====================
+// 🚀 INIT
+// =====================
 onMounted(async () => {
-
   selectedPeriod.value = pastMonths.value[0].value
-
   await loadTahunAjar()
-
   await loadClasses()
-
 })
 
+// =====================
+// 🔄 REFRESH
+// =====================
 const doRefresh = async (event) => {
-
   await loadTahunAjar()
   await loadClasses()
 
   if (selectedClass.value) {
-    await onClassChange()
+    await loadStudents()
   }
 
   event.target.complete()
-
 }
-
 </script>
 
 <style scoped>

@@ -8,7 +8,6 @@ import Login from '../views/Login.vue'
 
 // Import halaman baru
 import JadwalPelajaran from '../views/JadwalPelajaran.vue'
-import JadwalPiket from '../views/JadwalPiket.vue'
 import RiwayatAbsensi from '../views/RiwayatAbsensi.vue'
 import ProfileSiswa from '../views/ProfileSiswa.vue'
 import ProfileGuru from '../views/ProfileGuru.vue'
@@ -16,8 +15,10 @@ import RekapAbsensi from '../views/RekapAbsensi.vue'
 import AbsensiManual from '../views/AbsensiManual.vue'
 import PenilaianSikap from '../views/PenilaianSikap.vue'
 import RekapSikap from '../views/RekapSikap.vue'
-import NilaiSikapSiswa from '../views/NilaiSikapSiswa.vue'
+import NilaiSikapSiswa from '../views/NilaiSikap.vue'
 import Poinku from '../views/Poinku.vue'
+import InformasiAkun from '../views/InformasiAkun.vue'
+import KeamananAkun from '../views/KeamananAkun.vue'
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -54,11 +55,6 @@ const routes: Array<RouteRecordRaw> = [
     component: JadwalPelajaran
   },
   {
-    path: '/jadwal-piket',
-    name: 'JadwalPiket',
-    component: JadwalPiket
-  },
-  {
     path: '/riwayat-absensi',
     name: 'RiwayatAbsensi',
     component: RiwayatAbsensi
@@ -93,15 +89,25 @@ const routes: Array<RouteRecordRaw> = [
     name: 'RekapSikap',
     component: RekapSikap
   },
-  {
-    path: '/nilai-sikap-siswa',
-    name: 'NilaiSikapSiswa',
-    component: NilaiSikapSiswa
-  },
+  // {
+  //   path: '/nilai-sikap',
+  //   name: 'NilaiSikap',
+  //   component: NilaiSikapSiswa
+  // },
   {
     path: '/poinku',
     name: 'Poinku',
     component: Poinku
+  },
+  {
+    path: '/informasi-akun',
+    name: 'InformasiAkun',
+    component: InformasiAkun
+  },
+  {
+    path: '/keamanan-akun',
+    name: 'KeamananAkun',
+    component: KeamananAkun
   }
 ]
 

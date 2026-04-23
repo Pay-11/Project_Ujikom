@@ -5,12 +5,13 @@
       <ion-toolbar class="custom-header">
         <div class="user-greeting">
           <div class="avatar-box" @click="goTo('/profile-guru')">
-            <img src="https://ui-avatars.com/api/?name=Luddi&background=fff&color=e53935" alt="Avatar"/>
+            <img src="https://ui-avatars.com/api/?name=Luddi&background=fff&color=e53935" />
           </div>
-          <div class="greeting-text">
-            <h2>Hai, PA LUDDI 👋</h2>
-            <p>Guru RPL • NIP. 198001012010011001</p>
-          </div>
+          <h2>Hai, {{ user?.name || '-' }} 👋</h2>
+          <p>
+            {{ user?.role || '-' }} •
+            NIP. {{ user?.nip || '-' }}
+          </p>
         </div>
       </ion-toolbar>
     </ion-header>
@@ -18,31 +19,42 @@
     <ion-content class="bg-light">
       <div class="header-bg"></div>
 
-      <!-- KELAS SELANJUTNYA & SEDANG BERLANGSUNG -->
+      <!-- HERO -->
       <div class="hero-card">
         <div class="hero-header">
           <h3>Kelas Sedang Berlangsung</h3>
-          <span class="live-badge">Sedang Berjalan</span>
+          <span class="live-badge" v-if="kelasAktif">Sedang Berjalan</span>
         </div>
-        
+
         <div class="hero-body">
           <div class="subject-main">
-            <h2>XII RPL 2</h2>
-            <p><ion-icon :icon="bookOutline"></ion-icon> Konsentrasi Keahlian</p>
-            <p><ion-icon :icon="timeOutline"></ion-icon> 09:30 - 11:50 WIB</p>
+            <h2>{{ kelasAktif?.kelas || 'Tidak ada kelas' }}</h2>
+
+            <p>
+              <ion-icon :icon="bookOutline"></ion-icon>
+              {{ kelasAktif?.mapel || '-' }}
+            </p>
+
+            <p>
+              <ion-icon :icon="timeOutline"></ion-icon>
+              {{ kelasAktif
+                ? kelasAktif.jam_mulai + ' - ' + kelasAktif.jam_selesai
+                : '-' }}
+            </p>
           </div>
-          <button class="hero-scan-btn" @click="goTo('/guruqr')">
+
+          <button class="hero-scan-btn" v-if="kelasAktif" @click="goTo('/guruqr')">
             <ion-icon :icon="qrCodeOutline"></ion-icon>
             <span>Buka QR</span>
           </button>
         </div>
       </div>
 
-      <!-- MAIN MENU (Grid) Laporan & Rekap -->
+      <!-- MENU -->
       <div class="menu-container">
         <h4 class="section-title">Menu Utama</h4>
         <div class="menu-grid">
-          
+
           <div class="menu-item" @click="goTo('/rekap-absensi')">
             <div class="icon-wrapper color-green">
               <ion-icon :icon="documentTextOutline"></ion-icon>
@@ -64,7 +76,6 @@
             <span>Beri<br>Nilai</span>
           </div>
 
-          <!-- REKAP SIKAP -->
           <div class="menu-item" @click="goTo('/rekap-sikap')">
             <div class="icon-wrapper color-blue">
               <ion-icon :icon="statsChartOutline"></ion-icon>
@@ -75,74 +86,44 @@
         </div>
       </div>
 
-      <!-- JADWAL MENGAJAR -->
+      <!-- JADWAL -->
       <div class="schedule-list">
-        
-        <!-- HARI INI -->
+
         <div class="section-header">
           <h4 class="section-title">Jadwal Hari Ini</h4>
         </div>
 
-        <div class="subject-item done">
-          <div class="subject-icon"><ion-icon :icon="checkmarkCircleOutline"></ion-icon></div>
+        <div v-for="j in jadwalHariIni" :key="j.jadwal_id" class="subject-item" :class="getStatusClass(j)">
+          <div class="subject-icon">
+            <ion-icon :icon="getStatusIcon(j)"></ion-icon>
+          </div>
+
           <div class="subject-info">
-            <h4>X PPLG 3 - Basis Data</h4>
-            <p>Selesai • 07:15 - 08:45</p>
+            <h4>{{ j.kelas }} - {{ j.mapel }}</h4>
+            <p>
+              {{ getStatusText(j) }} •
+              {{ j.jam_mulai }} - {{ j.jam_selesai }}
+            </p>
           </div>
         </div>
 
-        <div class="subject-item active">
-          <div class="subject-icon"><ion-icon :icon="bookOutline"></ion-icon></div>
-          <div class="subject-info">
-            <h4>XII RPL 2 - Konsentrasi</h4>
-            <p>Berlangsung • 09:30 - 11:50</p>
-          </div>
-        </div>
-
-        <div class="subject-item pending">
-          <div class="subject-icon"><ion-icon :icon="timeOutline"></ion-icon></div>
-          <div class="subject-info">
-            <h4>Kelas Selanjutnya: XI PPLG 2</h4>
-            <p>Menunggu • 13:00 - 15:30</p>
-          </div>
-        </div>
-
-        <!-- BESOK -->
-        <div class="section-header mt-4">
-          <h4 class="section-title">Jadwal Besok</h4>
-        </div>
-        
-        <div class="kelas-card">
-          <div class="kelas-time">07:00 - 09:00</div>
-          <div class="kelas-details">
-            <h4>X AKL - Simulasi Digital</h4>
-            <p>Ruang Lab Komputer 1</p>
-          </div>
-        </div>
-
-        <div class="kelas-card">
-          <div class="kelas-time">09:00 - 12:00</div>
-          <div class="kelas-details">
-            <h4>XII IPS - Sejarah Komputer</h4>
-            <p>Ruang Kelas XII IPS 2</p>
-          </div>
-        </div>
       </div>
-
     </ion-content>
 
-    <!-- BOTTOM NAV -->
+    <!-- NAV -->
     <ion-footer class="ion-no-border">
       <div class="bottom-nav">
         <div class="nav-item active">
           <ion-icon :icon="home"></ion-icon>
           <span>Beranda</span>
         </div>
+
         <div class="nav-item fab-wrapper" @click="goTo('/guruqr')">
           <div class="nav-fab">
             <ion-icon :icon="qrCodeOutline"></ion-icon>
           </div>
         </div>
+
         <div class="nav-item" @click="goTo('/profile-guru')">
           <ion-icon :icon="personOutline"></ion-icon>
           <span>Profil</span>
@@ -156,19 +137,101 @@
 import {
   IonPage, IonHeader, IonToolbar, IonContent, IonFooter, IonIcon
 } from '@ionic/vue'
+
 import {
-  timeOutline, qrCodeOutline, documentTextOutline, 
-  downloadOutline, bookOutline, personCircleOutline,
-  checkmarkCircleOutline, home, personOutline, createOutline, starOutline, statsChartOutline
+  timeOutline, qrCodeOutline, documentTextOutline,
+  bookOutline, checkmarkCircleOutline, home, personOutline,
+  createOutline, starOutline, statsChartOutline
 } from 'ionicons/icons'
 
 import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue'
+import api from '@/services/api'
 
 const router = useRouter()
+
+const user = ref(null)
+
+const jadwalHariIni = ref([])
+const kelasAktif = ref(null)
 
 const goTo = (path) => {
   router.push(path)
 }
+
+const fetchUser = async () => {
+  try {
+    const res = await api.get('me')
+    user.value = res.data.data
+  } catch (err) {
+    console.error('Gagal ambil user:', err)
+  }
+}
+
+const fetchJadwal = async () => {
+  try {
+    const res = await api.get('jadwal/guru-hari-ini')
+
+    const data = res.data.data
+    jadwalHariIni.value = data
+
+    const now = new Date()
+
+    data.forEach(j => {
+      const mulai = new Date()
+      const selesai = new Date()
+
+      const [jm, mm] = j.jam_mulai.split(':')
+      const [js, ms] = j.jam_selesai.split(':')
+
+      mulai.setHours(jm, mm)
+      selesai.setHours(js, ms)
+
+      if (now >= mulai && now <= selesai) {
+        kelasAktif.value = j
+      }
+    })
+
+  } catch (err) {
+    console.error('Gagal ambil jadwal:', err)
+  }
+}
+
+const getStatusClass = (j) => {
+  const now = new Date()
+
+  const mulai = new Date()
+  const selesai = new Date()
+
+  const [jm, mm] = j.jam_mulai.split(':')
+  const [js, ms] = j.jam_selesai.split(':')
+
+  mulai.setHours(jm, mm)
+  selesai.setHours(js, ms)
+
+  if (now > selesai) return 'done'
+  if (now >= mulai && now <= selesai) return 'active'
+  return 'pending'
+}
+
+const getStatusText = (j) => {
+  const s = getStatusClass(j)
+  if (s === 'done') return 'Selesai'
+  if (s === 'active') return 'Berlangsung'
+  return 'Menunggu'
+}
+
+const getStatusIcon = (j) => {
+  const s = getStatusClass(j)
+  if (s === 'done') return checkmarkCircleOutline
+  if (s === 'active') return bookOutline
+  return timeOutline
+}
+
+onMounted(() => {
+  fetchUser()
+  fetchJadwal()
+})
 </script>
 
 <style scoped>
@@ -212,8 +275,8 @@ const goTo = (path) => {
   height: 50px;
   border-radius: 50%;
   overflow: hidden;
-  border: 3px solid rgba(255,255,255,0.8);
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  border: 3px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
   cursor: pointer;
 }
 
@@ -237,7 +300,7 @@ const goTo = (path) => {
 .greeting-text p {
   margin: 0;
   font-size: 12px;
-  color: rgba(255,255,255,0.8);
+  color: rgba(255, 255, 255, 0.8);
   font-weight: 500;
 }
 
@@ -279,9 +342,17 @@ const goTo = (path) => {
 }
 
 @keyframes pulse {
-  0% { opacity: 1; }
-  50% { opacity: 0.6; }
-  100% { opacity: 1; }
+  0% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.6;
+  }
+
+  100% {
+    opacity: 1;
+  }
 }
 
 .hero-body {
@@ -377,15 +448,29 @@ const goTo = (path) => {
   align-items: center;
   font-size: 26px;
   margin-bottom: 8px;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
   background: white;
 }
 
-.color-green { color: #10b981; }
-.color-orange { color: #f59e0b; }
-.color-gray { color: #6b7280; }
-.color-purple { color: #8b5cf6; }
-.color-blue { color: #3b82f6; }
+.color-green {
+  color: #10b981;
+}
+
+.color-orange {
+  color: #f59e0b;
+}
+
+.color-gray {
+  color: #6b7280;
+}
+
+.color-purple {
+  color: #8b5cf6;
+}
+
+.color-blue {
+  color: #3b82f6;
+}
 
 .menu-item span {
   font-size: 12px;
@@ -420,7 +505,7 @@ const goTo = (path) => {
   padding: 16px;
   border-radius: 16px;
   margin-bottom: 12px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
 }
 
 .subject-icon {
@@ -446,15 +531,36 @@ const goTo = (path) => {
   font-weight: 500;
 }
 
-.subject-item.done .subject-icon { background: #d1fae5; color: #10b981; }
-.subject-item.done .subject-info p { color: #10b981; }
+.subject-item.done .subject-icon {
+  background: #d1fae5;
+  color: #10b981;
+}
 
-.subject-item.active { border-left: 4px solid #e53935; }
-.subject-item.active .subject-icon { background: #fee2e2; color: #e53935; }
-.subject-item.active .subject-info p { color: #e53935; }
+.subject-item.done .subject-info p {
+  color: #10b981;
+}
 
-.subject-item.pending .subject-icon { background: #f3f4f6; color: #9ca3af; }
-.subject-item.pending .subject-info p { color: #9ca3af; }
+.subject-item.active {
+  border-left: 4px solid #e53935;
+}
+
+.subject-item.active .subject-icon {
+  background: #fee2e2;
+  color: #e53935;
+}
+
+.subject-item.active .subject-info p {
+  color: #e53935;
+}
+
+.subject-item.pending .subject-icon {
+  background: #f3f4f6;
+  color: #9ca3af;
+}
+
+.subject-item.pending .subject-info p {
+  color: #9ca3af;
+}
 
 /* Timeline Card Lusa / Besok */
 .kelas-card {
@@ -465,7 +571,7 @@ const goTo = (path) => {
   display: flex;
   align-items: center;
   gap: 16px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.02);
   border-left: 4px solid #fca5a5;
 }
 
@@ -501,7 +607,7 @@ const goTo = (path) => {
   align-items: flex-end;
   height: 65px;
   padding-bottom: 10px;
-  box-shadow: 0 -10px 20px rgba(0,0,0,0.03);
+  box-shadow: 0 -10px 20px rgba(0, 0, 0, 0.03);
   position: relative;
 }
 

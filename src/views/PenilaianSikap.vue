@@ -172,13 +172,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router' // ← INI YANG LO LUPAIN
+import api from '../services/api'
+
 import {
-  IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
-  IonButtons, IonBackButton, IonIcon, IonButton,
+  IonPage, IonHeader, IonToolbar, IonButtons, IonBackButton,
+  IonButton, IonTitle, IonContent, IonIcon,
   IonRefresher, IonRefresherContent
 } from '@ionic/vue'
-
-import { useRouter } from 'vue-router'
 
 import {
   statsChartOutline,
@@ -190,31 +191,26 @@ import {
   chevronForwardOutline
 } from 'ionicons/icons'
 
-import api from '../services/api'
-
 const router = useRouter()
+const route = useRoute() // ← WAJIB ADA
+
+const selectedJadwalId = ref(null)
 
 /* ===============================
 PERIODE
 ================================ */
-
 const pastMonths = computed(() => {
   const months = []
   const date = new Date()
 
-  const formatOpt = { month: 'long', year: 'numeric' }
-
   for (let i = 0; i < 4; i++) {
     const d = new Date(date.getFullYear(), date.getMonth() - i, 1)
 
-    const label = d.toLocaleDateString('id-ID', formatOpt)
-
-    const valueStr =
-      `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-01`
-
     months.push({
-      label,
-      value: valueStr
+      label: d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }),
+      value: `${d.getFullYear()}-${(d.getMonth() + 1)
+        .toString()
+        .padStart(2, '0')}-01`
     })
   }
 
@@ -224,36 +220,33 @@ const pastMonths = computed(() => {
 const selectedPeriod = ref('')
 
 const getPeriodLabel = (val) => {
-  const fd = pastMonths.value.find(m => m.value === val)
-  return fd ? fd.label : val
+  const found = pastMonths.value.find(m => m.value === val)
+  return found ? found.label : val
 }
 
 /* ===============================
-DATA API
+DATA
 ================================ */
-
 const classes = ref([])
 const studentsList = ref([])
 const categories = ref([])
 
 const tahunAjarId = ref(null)
-
 const selectedClass = ref('')
 
 /* ===============================
 LOAD DATA
 ================================ */
-
 const loadTahunAjar = async () => {
-  const res = await api.get('tahun-ajar')
-
+  const res = await api.get('akademik/tahun-ajar')
   const aktif = res.data.data.find(t => t.aktif)
-
-  tahunAjarId.value = aktif.id
+  tahunAjarId.value = aktif?.id || null
 }
 
 const loadClasses = async () => {
-  const res = await api.post('kelas', {
+  if (!tahunAjarId.value) return
+
+  const res = await api.post('akademik/kelas', {
     tahun_ajar_id: tahunAjarId.value
   })
 
@@ -261,15 +254,17 @@ const loadClasses = async () => {
 }
 
 const loadCategories = async () => {
-  const res = await api.get('assessment-categories')
-
+  const res = await api.get('assessment/categories')
   categories.value = res.data.data
 }
 
 const onClassChange = async () => {
+  if (!selectedClass.value || !selectedPeriod.value) return
+
+  await loadJadwalHariIni() // ← TAMBAH INI DULU
 
   const res = await api.get(
-    `murid-kelas/${selectedClass.value}?period=${selectedPeriod.value.slice(0, 7)}`
+    `akademik/murid-kelas/${selectedClass.value}?period=${selectedPeriod.value.slice(0, 7)}`
   )
 
   studentsList.value = res.data.data
@@ -278,84 +273,67 @@ const onClassChange = async () => {
 /* ===============================
 PROGRESS
 ================================ */
-
-const evaluatedCount = computed(() => {
-  return studentsList.value.filter(s => s.isEvaluated).length
-})
+const evaluatedCount = computed(() =>
+  studentsList.value.filter(s => s.isEvaluated).length
+)
 
 const progressPercent = computed(() => {
-
   if (!studentsList.value.length) return 0
 
   return Math.round(
-    evaluatedCount.value / studentsList.value.length * 100
+    (evaluatedCount.value / studentsList.value.length) * 100
   )
 })
 
 /* ===============================
 MODAL
 ================================ */
-
 const showModal = ref(false)
-
 const activeStudent = ref(null)
-
 const activeIndex = ref(-1)
 
 const ratings = ref([])
-
 const feedbackText = ref('')
-
 const isSubmitting = ref(false)
 
 const openModal = (student, index) => {
-
   activeStudent.value = student
-
   activeIndex.value = index
 
   ratings.value = new Array(categories.value.length).fill(0)
-
   feedbackText.value = ''
 
   showModal.value = true
 }
 
 const closeModal = () => {
-
   showModal.value = false
-
   activeStudent.value = null
-
   activeIndex.value = -1
 }
 
-const hasNextStudent = computed(() => {
-
-  return activeIndex.value < studentsList.value.length - 1
-})
+const hasNextStudent = computed(() =>
+  activeIndex.value < studentsList.value.length - 1
+)
 
 /* ===============================
 RATING LABEL
 ================================ */
-
 const getRatingLabel = (val) => {
-
-  if (val === 5) return 'Sangat Baik (5)'
-  if (val === 4) return 'Baik (4)'
-  if (val === 3) return 'Cukup (3)'
-  if (val === 2) return 'Kurang (2)'
-  if (val === 1) return 'Sangat Kurang (1)'
-
-  return 'Belum Dinilai'
+  switch (val) {
+    case 5: return 'Sangat Baik (5)'
+    case 4: return 'Baik (4)'
+    case 3: return 'Cukup (3)'
+    case 2: return 'Kurang (2)'
+    case 1: return 'Sangat Kurang (1)'
+    default: return 'Belum Dinilai'
+  }
 }
 
 /* ===============================
-SIMPAN NILAI
+SAVE
 ================================ */
-
 const saveEvaluation = async (goToNext) => {
-
   const isComplete = ratings.value.every(r => r > 0)
 
   if (!isComplete) {
@@ -363,87 +341,98 @@ const saveEvaluation = async (goToNext) => {
     return
   }
 
+  if (!selectedJadwalId.value) {
+    alert("jadwal_id tidak ada 😑")
+    return
+  }
+
   isSubmitting.value = true
 
   try {
-
     const scores = categories.value.map((c, i) => ({
       category_id: c.id,
       score: ratings.value[i]
     }))
 
     const payload = {
-
-      evaluatee_id: activeStudent.value.id,
-
-      period: selectedPeriod.value.slice(0, 7),
-
-      general_notes: feedbackText.value,
-
-      scores: scores
+      jadwal_id: selectedJadwalId.value,
+      murid_id: activeStudent.value.id,
+      catatan: feedbackText.value,
+      scores
     }
 
-    await api.post('assessment', payload)
+    await api.post('assessment/', payload)
 
     studentsList.value[activeIndex.value].isEvaluated = true
 
     if (goToNext && hasNextStudent.value) {
-
-      const nextIndex = activeIndex.value + 1
-
-      openModal(studentsList.value[nextIndex], nextIndex)
-
+      openModal(
+        studentsList.value[activeIndex.value + 1],
+        activeIndex.value + 1
+      )
     } else {
-
       closeModal()
-
     }
 
   } catch (err) {
-
     alert(err.response?.data?.message || "Gagal menyimpan")
-
   } finally {
-
     isSubmitting.value = false
+  }
+}
+
+const loadJadwalHariIni = async () => {
+  try {
+    const res = await api.get('jadwal/guru-hari-ini') // sesuaikan route lo
+
+    const jadwalList = res.data.data
+
+    // cari jadwal sesuai kelas yang dipilih
+    const found = jadwalList.find(j => j.kelas_id == selectedClass.value)
+
+    if (!found) {
+      alert("Tidak ada jadwal hari ini di kelas ini 😑")
+      selectedJadwalId.value = null
+      return
+    }
+
+    selectedJadwalId.value = found.jadwal_id
+
+  } catch (err) {
+    console.error(err)
+    alert("Gagal ambil jadwal")
   }
 }
 
 /* ===============================
 NAVIGATION
 ================================ */
-
 const goToRekap = () => {
-
   router.push('/rekap-sikap')
 }
 
 /* ===============================
 INIT
 ================================ */
-
 onMounted(async () => {
-
   selectedPeriod.value = pastMonths.value[0].value
 
+  // ambil query
+  selectedJadwalId.value = route.query.jadwal_id
+
   await loadTahunAjar()
-
   await loadClasses()
-
   await loadCategories()
 })
 
 const doRefresh = async (event) => {
-
   try {
-
     await loadClasses()
     await loadCategories()
 
     if (selectedClass.value) {
       await onClassChange()
     }
-
   } catch (err) {
     console.error(err)
   }

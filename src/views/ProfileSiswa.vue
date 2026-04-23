@@ -90,7 +90,11 @@ const router = useRouter()
 
 const openMenu = (type) => {
   console.log('Membuka menu', type)
-  // Logic untuk pindah route atau menampilkan modal
+  if (type === 'data') {
+    router.push('/informasi-akun')
+  } else if (type === 'security') {
+    router.push('/keamanan-akun')
+  }
 }
 
 const handleLogout = () => {
